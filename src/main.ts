@@ -6,7 +6,6 @@ import { logger } from '~/log';
 import { registerProfileDataWorker } from './worker/ProfileData';
 import { getSteamIdBatch } from './steam/batcher';
 import { profileDataQueue, profileDataQueueEvents } from './queue';
-import { getCityJson } from './actions/getCityJson';
 
 const startServer = async () => {
   const app = fastify();
@@ -31,13 +30,13 @@ const startServer = async () => {
       req: FastifyRequest<{
         Querystring: {
           client_id: string;
-          start?: number;
-          batchSize?: number;
+          start?: string;
+          batchSize?: string;
         };
       }>,
       res,
     ) => {
-      const { client_id, start = 1, batchSize = 100 } = req.query;
+      const { client_id, start = '1', batchSize = '100' } = req.query;
       if (!client_id) {
         await res.status(400).send({ error: 'No client_id provided' });
         return;
@@ -46,8 +45,8 @@ const startServer = async () => {
       let batcher = batchers[client_id];
       if (!batcher) {
         batcher = batchers[client_id] = getSteamIdBatch({
-          start,
-          batchSize,
+          start: parseInt(start.toString(), 10),
+          batchSize: parseInt(batchSize.toString(), 10),
         });
       }
 
