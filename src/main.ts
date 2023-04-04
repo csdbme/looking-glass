@@ -6,6 +6,7 @@ import { logger } from '~/log';
 import { registerProfileDataWorker } from './worker/ProfileData';
 import { getSteamIdBatch } from './steam/batcher';
 import { profileDataQueue, profileDataQueueEvents } from './queue';
+import { log } from 'console';
 
 const startServer = async () => {
   const app = fastify();
@@ -22,7 +23,12 @@ const startServer = async () => {
 
   registerProfileDataWorker();
 
-  const batchers: { [key: string]: ReturnType<typeof getSteamIdBatch> } = {};
+  const batcherState: {
+    [clientId: string]: {
+      current: number;
+      options: { start: number; batchSize: number };
+    };
+  } = {};
 
   app.get(
     '/getIncrementalProfileData',
@@ -36,19 +42,30 @@ const startServer = async () => {
       }>,
       res,
     ) => {
-      const { client_id, start = '1', batchSize = '100' } = req.query;
+      const { client_id, start = '0', batchSize = '100' } = req.query;
       if (!client_id) {
         await res.status(400).send({ error: 'No client_id provided' });
         return;
       }
 
-      let batcher = batchers[client_id];
-      if (!batcher) {
-        batcher = batchers[client_id] = getSteamIdBatch({
+      const state = batcherState[client_id] ?? {
+        current: parseInt(start.toString(), 10),
+        options: {
           start: parseInt(start.toString(), 10),
           batchSize: parseInt(batchSize.toString(), 10),
-        });
+        },
+      };
+      if (batchSize !== state.options.batchSize.toString()) {
+        logger.info(
+          `[ID: ${client_id}] Batch size changed. Old: ${state.options.batchSize}, new: ${batchSize}`,
+        );
+        state.options.batchSize = parseInt(batchSize.toString(), 10);
       }
+
+      const batcher = getSteamIdBatch({
+        start: state.current + 1, // + 1 because the current batch is already done
+        batchSize: state.options.batchSize,
+      });
 
       const batch = batcher.next().value;
 
@@ -57,6 +74,9 @@ const startServer = async () => {
         await res.status(500).send({ error: 'No more steamIds' });
         return;
       }
+
+      state.current = batch.current;
+      batcherState[client_id] = state;
 
       logger.info(
         `[ID: ${client_id}] Requesting profile data. Start: ${start}, batchSize: ${batchSize}, current: ${batch.current}`,
@@ -69,7 +89,10 @@ const startServer = async () => {
       const result = await job.waitUntilFinished(profileDataQueueEvents);
 
       await res.send({
-        result,
+        result: {
+          current: state.current,
+          data: result.data,
+        },
       });
     },
   );

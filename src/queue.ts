@@ -40,7 +40,7 @@ export const profileDataQueue = new Queue<
     steamIds: string[];
   },
   {
-    profileData: z.infer<typeof playerSchema>;
+    data: (z.infer<typeof playerSchema> & { accountId: number })[];
   }
 >('profileData', {
   sharedConnection: true,

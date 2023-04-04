@@ -41,11 +41,12 @@ export const getPlayerSummaries = async (steamIds: string[]) => {
     return 0;
   });
   const mappedPlayers = parsedProfileData.data.response.players.map(async (player) => {
+    const accountId = new SteamID(player.steamid).accountid;
     if (player.loccityid) {
       const city = await getCityForId(player.loccityid);
-      return { ...player, city: city };
+      return { ...player, accountId, city: city };
     }
-    return player;
+    return { ...player, accountId };
   });
   const awaitedPlayers = await Promise.all(mappedPlayers);
 
