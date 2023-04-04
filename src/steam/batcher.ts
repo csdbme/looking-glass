@@ -11,7 +11,7 @@ export function* getSteamIdBatch(
     const steamId = SteamID.fromIndividualAccountID(current);
     batch.push(steamId.getSteamID64());
     if (batch.length === batchSize) {
-      yield batch;
+      yield { steamIds: batch, current };
       batch = [];
     }
     current++;

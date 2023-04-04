@@ -51,14 +51,20 @@ const startServer = async () => {
         });
       }
 
-      const steamIds = batcher.next().value;
-      if (!steamIds) {
+      const batch = batcher.next().value;
+
+      if (!batch) {
+        logger.info(`[${client_id}] No more steamIds`);
         await res.status(500).send({ error: 'No more steamIds' });
         return;
       }
 
+      logger.info(
+        `[${client_id}] Requesting profile data. Start: ${start}, batchSize: ${batchSize}, current: ${batch.current}`,
+      );
+
       const job = await profileDataQueue.add('profileData', {
-        steamIds,
+        steamIds: batch.steamIds,
       });
 
       const result = await job.waitUntilFinished(profileDataQueueEvents);
