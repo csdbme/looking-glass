@@ -37,4 +37,16 @@ export const playerSchema = z.object({
   loccountrycode: z.string().optional(), // If set on the user's Steam Community profile, The user's country of residence, 2-character ISO country code
   locstatecode: z.string().optional(), // If set on the user's Steam Community profile, The user's state of residence
   loccityid: z.number().optional(),
+
+  // Our props
+  city: z
+    .object({
+      name: z.string(),
+      coordinates: z.object({
+        err: z.union([z.string(), z.object({})]).optional(),
+        lat: z.number().optional(),
+        lng: z.number().optional(),
+      }),
+    })
+    .optional(),
 });

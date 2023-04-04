@@ -1,5 +1,7 @@
 import { Queue, QueueEvents, type ConnectionOptions } from 'bullmq';
 import { env } from './env';
+import { type z } from 'zod';
+import { type playerSchema } from './types/Player.types';
 import { logger } from './log';
 
 export const connection: ConnectionOptions = {
@@ -38,7 +40,7 @@ export const profileDataQueue = new Queue<
     steamIds: string[];
   },
   {
-    profileData: string;
+    profileData: z.infer<typeof playerSchema>;
   }
 >('profileData', {
   sharedConnection: true,
