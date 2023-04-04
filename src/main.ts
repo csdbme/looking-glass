@@ -1,0 +1,85 @@
+import fastify, { type FastifyRequest } from 'fastify';
+import fastifyCors from '@fastify/cors';
+
+import { env } from '~/env';
+import { logger } from '~/log';
+import { registerProfileDataWorker } from './worker/ProfileData';
+import { getSteamIdBatch } from './steam/batcher';
+import { profileDataQueue, profileDataQueueEvents } from './queue';
+import SteamID from 'steamid';
+
+const startServer = async () => {
+  const app = fastify();
+
+  const origins = env.CORS_ORIGINS.split(',');
+  if (origins.length === 0) {
+    logger.error('No CORS origins specified');
+    process.exit(1);
+  }
+
+  await app.register(fastifyCors, {
+    origin: origins,
+  });
+
+  registerProfileDataWorker();
+
+  const batchers: { [key: string]: ReturnType<typeof getSteamIdBatch> } = {};
+
+  app.get(
+    '/getIncrementalProfileData',
+    async (
+      req: FastifyRequest<{
+        Querystring: {
+          client_id: string;
+          start?: number;
+          batchSize?: number;
+        };
+      }>,
+      res,
+    ) => {
+      const { client_id, start = 1, batchSize = 100 } = req.query;
+      if (!client_id) {
+        await res.status(400).send({ error: 'No client_id provided' });
+        return;
+      }
+
+      let batcher = batchers[client_id];
+      if (!batcher) {
+        batcher = batchers[client_id] = getSteamIdBatch({
+          start,
+          batchSize,
+        });
+      }
+
+      const steamIds = batcher.next().value;
+      if (!steamIds) {
+        await res.status(500).send({ error: 'No more steamIds' });
+        return;
+      }
+
+      const job = await profileDataQueue.add('profileData', {
+        steamIds,
+      });
+
+      const result = await job.waitUntilFinished(profileDataQueueEvents);
+
+      await res.send({
+        result,
+      });
+    },
+  );
+
+  await app
+    .listen({
+      port: +env.SERVER_PORT,
+    })
+    .then(() => {
+      logger.info(`Looking Glass listening on port ${env.SERVER_PORT}`);
+    })
+    .catch((err) => {
+      logger.error('Fastify error: ', err);
+      process.exit(1);
+    });
+};
+
+void startServer();
