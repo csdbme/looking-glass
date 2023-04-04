@@ -75,6 +75,39 @@ const startServer = async () => {
     },
   );
 
+  app.get(
+    '/playerSummaries',
+    async (
+      req: FastifyRequest<{
+        Querystring: {
+          steamIds: string;
+        };
+      }>,
+      res,
+    ) => {
+      if (!req.query.steamIds) {
+        await res.status(400).send({ error: 'No steamIds provided' });
+        return;
+      }
+
+      const steamIds = req.query.steamIds.split(',');
+      if (steamIds.length > 100) {
+        await res.status(400).send({ error: 'Too many steamIds provided' });
+        return;
+      }
+
+      const job = await profileDataQueue.add('profileData', {
+        steamIds,
+      });
+
+      const result = await job.waitUntilFinished(profileDataQueueEvents);
+
+      await res.send({
+        result,
+      });
+    },
+  );
+
   await app
     .listen({
       port: +env.SERVER_PORT,
