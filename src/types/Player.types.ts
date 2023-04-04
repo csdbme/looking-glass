@@ -1,24 +1,32 @@
 import { z } from 'zod';
 
+export enum PersonaState {
+  Offline = 0,
+  Online = 1,
+  Busy = 2,
+  Away = 3,
+  Snooze = 4,
+  LookingToTrade = 5,
+  LookingToPlay = 6,
+}
+
+export enum CommunityVisibleState {
+  Private = 1,
+  FriendsOnly = 2,
+  Public = 3,
+}
+
 export const playerSchema = z.object({
   steamid: z.string(),
-  communityvisibilitystate: z.number(), // Only two possible values returned: 1 - the profile is not visible to you (Private, Friends Only, etc), 3 - the profile is "Public", and the data is visible
+  communityvisibilitystate: z.nativeEnum(CommunityVisibleState), // 1 - the profile is not visible to you (Private), 2 - Friends Only, 3 - the profile is "Public", and the data is visible
   profilestate: z.number().optional(), // If set, indicates the user has a community profile configured (will be set to '1')
   personaname: z.string(), // The player's persona name (display name)
-  profileurl: z.string(), // The full URL of the player's Steam Community profile.
-  avatar: z.string(), // The full URL of the player's 32x32px avatar. If the user hasn't configured an avatar, this will be the default ? avatar.
-  avatarmedium: z.string(), // The full URL of the player's 64x64px avatar. If the user hasn't configured an avatar, this will be the default ? avatar.
-  avatarfull: z.string(), // The full URL of the player's 184x184px avatar. If the user hasn't configured an avatar, this will be the default ? avatar.
+  profileurl: z.string().url(), // The full URL of the player's Steam Community profile.
+  avatar: z.string().url(), // The full URL of the player's 32x32px avatar. If the user hasn't configured an avatar, this will be the default ? avatar.
+  avatarmedium: z.string().url(), // The full URL of the player's 64x64px avatar. If the user hasn't configured an avatar, this will be the default ? avatar.
+  avatarfull: z.string().url(), // The full URL of the player's 184x184px avatar. If the user hasn't configured an avatar, this will be the default ? avatar.
   avatarhash: z.string(),
-  personastate: z.union([
-    z.literal(0), // 0 - Offline
-    z.literal(1), // 1 - Online
-    z.literal(2), // 2 - Busy
-    z.literal(3), // 3 - Away
-    z.literal(4), // 4 - Snooze
-    z.literal(5), // 5 - looking to trade
-    z.literal(6), // 6 - looking to play
-  ]), // The user's current status. If the player's profile is private, this will always be "0", except is the user has set their status to looking to trade or looking to play, because a bug makes those status appear even if the profile is private.
+  personastate: z.nativeEnum(PersonaState), // The user's current status. If the player's profile is private, this will always be "0", except is the user has set their status to looking to trade or looking to play, because a bug makes those status appear even if the profile is private.
   personastateflags: z.number().optional(),
   commentpermission: z.number().optional(), // If set, indicates the profile allows public comments.
 

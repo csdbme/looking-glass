@@ -6,7 +6,7 @@ import { logger } from '~/log';
 import { registerProfileDataWorker } from './worker/ProfileData';
 import { getSteamIdBatch } from './steam/batcher';
 import { profileDataQueue, profileDataQueueEvents } from './queue';
-import SteamID from 'steamid';
+import { getCityJson } from './actions/getCityJson';
 
 const startServer = async () => {
   const app = fastify();
@@ -54,13 +54,13 @@ const startServer = async () => {
       const batch = batcher.next().value;
 
       if (!batch) {
-        logger.info(`[${client_id}] No more steamIds`);
+        logger.info(`[ID: ${client_id}] No more steamIds`);
         await res.status(500).send({ error: 'No more steamIds' });
         return;
       }
 
       logger.info(
-        `[${client_id}] Requesting profile data. Start: ${start}, batchSize: ${batchSize}, current: ${batch.current}`,
+        `[ID: ${client_id}] Requesting profile data. Start: ${start}, batchSize: ${batchSize}, current: ${batch.current}`,
       );
 
       const job = await profileDataQueue.add('profileData', {
@@ -80,11 +80,17 @@ const startServer = async () => {
     async (
       req: FastifyRequest<{
         Querystring: {
+          client_id: string;
           steamIds: string;
         };
       }>,
       res,
     ) => {
+      if (!req.query.client_id) {
+        await res.status(400).send({ error: 'No client_id provided' });
+        return;
+      }
+
       if (!req.query.steamIds) {
         await res.status(400).send({ error: 'No steamIds provided' });
         return;
@@ -95,7 +101,9 @@ const startServer = async () => {
         await res.status(400).send({ error: 'Too many steamIds provided' });
         return;
       }
-
+      logger.info(
+        `[ID: ${req.query.client_id}] Requesting profile data for ${steamIds.length} steamIds`,
+      );
       const job = await profileDataQueue.add('profileData', {
         steamIds,
       });

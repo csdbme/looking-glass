@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { env } from '~/env';
 import { playerSchema } from '~/types/Player.types';
+import { getCityForId } from './getCityForId';
 
 const requestSchema = z.object({
   response: z.object({
@@ -39,6 +40,14 @@ export const getPlayerSummaries = async (steamIds: string[]) => {
     }
     return 0;
   });
+  const mappedPlayers = parsedProfileData.data.response.players.map(async (player) => {
+    if (player.loccityid) {
+      const city = await getCityForId(player.loccityid);
+      return { ...player, city: city };
+    }
+    return player;
+  });
+  const awaitedPlayers = await Promise.all(mappedPlayers);
 
-  return { data: parsedProfileData.data.response.players };
+  return { data: awaitedPlayers };
 };
